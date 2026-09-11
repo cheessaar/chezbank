@@ -17,7 +17,7 @@ const inputVes = document.getElementById('input-ves');
 const igtfSwitch = document.getElementById('igtf-switch');
 const toast = document.getElementById('toast');
 
-// Haptic Feedback (Vibración nativa si está disponible)
+// Haptic Feedback (Vibración nativa)
 const haptic = () => {
     if (navigator.vibrate) navigator.vibrate(15);
 };
@@ -41,10 +41,13 @@ const updateDashboard = () => {
     }
 };
 
-// Lógica de Tasa Anticipada (Banner)
+// Lógica de Tasa Anticipada (Oculta si la API no provee fecha futura)
 const checkFutureRate = (bcvDateStr) => {
     const banner = document.getElementById('future-rate-banner');
-    if (!bcvDateStr) return;
+    if (!bcvDateStr) {
+        banner.classList.add('hidden');
+        return;
+    }
 
     const today = new Date();
     const localDate = today.toISOString().split('T')[0];
@@ -97,7 +100,7 @@ document.querySelectorAll('.chip').forEach(btn => {
     });
 });
 
-// Portapapeles (Copiado Rápido WhatsApp)
+// Portapapeles (Copiado Rápido)
 document.querySelectorAll('.clickable').forEach(card => {
     card.addEventListener('click', (e) => {
         haptic();
@@ -117,41 +120,39 @@ document.querySelectorAll('.clickable').forEach(card => {
     });
 });
 
-// Consumo de API usando Proxy CORS
+// Consumo de APIs Globales (Sin errores de CORS)
 const fetchRates = async () => {
     refreshBtn.classList.add('spin');
     
     try {
-        const urlBCV = encodeURIComponent('https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=bcv');
-        const urlBinance = encodeURIComponent('https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=binance');
-
-        const resBCV = await fetch(`https://corsproxy.io/?${urlBCV}`);
-        const dataBCV = await resBCV.json();
+        const resUSD = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+        const dataUSD = await resUSD.json();
         
-        const resBinance = await fetch(`https://corsproxy.io/?${urlBinance}`);
-        const dataBinance = await resBinance.json();
+        const resEUR = await fetch('https://api.exchangerate-api.com/v4/latest/EUR');
+        const dataEUR = await resEUR.json();
+
+        const resYadio = await fetch('https://api.yadio.io/json/ves');
+        const dataYadio = await resYadio.json();
 
         rates = {
-            bcv_usd: dataBCV.monedas.usd.price || 0,
-            bcv_eur: dataBCV.monedas.eur.price || 0,
-            binance_buy: dataBinance.monedas.buy.price || 0, 
-            binance_sell: dataBinance.monedas.sell.price || 0,
-            date: dataBCV.monedas.usd.last_update || new Date().toISOString()
+            bcv_usd: dataUSD.rates.VES || 0, 
+            bcv_eur: dataEUR.rates.VES || 0,
+            binance_buy: dataYadio.binance?.price || dataYadio.usd?.price || 0, 
+            binance_sell: dataYadio.binance?.price || dataYadio.usd?.price || 0,
+            date: new Date().toLocaleDateString('es-VE')
         };
 
-        // Cacheo Offline
         localStorage.setItem('tasasVzlaCache', JSON.stringify(rates));
         
-        // Actualizar UI
         statusDot.className = 'dot green';
         statusText.innerText = "Actualizado";
-        checkFutureRate(dataBCV.monedas.usd.fecha_valor || null);
+        checkFutureRate(null); // Desactivar banner anticipado por falta de endpoint
         updateDashboard();
         calculate('divisa');
         haptic();
 
     } catch (error) {
-        console.warn('Fallo de red o CORS, cargando caché local:', error);
+        console.warn('Error de red, cargando datos locales:', error);
         
         const cached = localStorage.getItem('tasasVzlaCache');
         if (cached) {
@@ -173,14 +174,12 @@ refreshBtn.addEventListener('click', () => {
     fetchRates();
 });
 
-// Inicialización de la App
+// Inicialización
 window.addEventListener('DOMContentLoaded', () => {
-    // 1. Intentar cargar caché local para que la UI no inicie en blanco
     const cached = localStorage.getItem('tasasVzlaCache');
     if (cached) {
         rates = JSON.parse(cached);
         updateDashboard();
     }
-    // 2. Ejecutar la descarga en segundo plano
     fetchRates();
 });

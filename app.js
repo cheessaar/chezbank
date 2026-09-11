@@ -121,40 +121,40 @@ document.querySelectorAll('.clickable').forEach(card => {
 });
 
 // Consumo de API
+// Consumo de API con Proxy CORS para uso personal
 const fetchRates = async () => {
     refreshBtn.classList.add('spin');
     
     try {
-        /* Nota: URL de ejemplo utilizando pyDolarVenezuela pública
-           En un entorno real de producción, evaluar CORS. */
-        const resBCV = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=bcv');
+        // Usamos corsproxy.io para saltar la restricción del navegador
+        const urlBCV = encodeURIComponent('https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=bcv');
+        const urlBinance = encodeURIComponent('https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=binance');
+
+        const resBCV = await fetch(`https://corsproxy.io/?${urlBCV}`);
         const dataBCV = await resBCV.json();
         
-        const resBinance = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=binance');
+        const resBinance = await fetch(`https://corsproxy.io/?${urlBinance}`);
         const dataBinance = await resBinance.json();
 
-        // Mapeo (Esto debe ajustarse según el JSON exacto de la API)
         rates = {
             bcv_usd: dataBCV.monedas.usd.price || 0,
             bcv_eur: dataBCV.monedas.eur.price || 0,
-            binance_buy: dataBinance.monedas.buy.price || 0, // Ajustar key según respuesta real
+            binance_buy: dataBinance.monedas.buy.price || 0, 
             binance_sell: dataBinance.monedas.sell.price || 0,
             date: dataBCV.monedas.usd.last_update || new Date().toISOString()
         };
 
-        // Cacheo Offline
         localStorage.setItem('tasasVzlaCache', JSON.stringify(rates));
         
-        // UI
         statusDot.className = 'dot green';
         statusText.innerText = "Actualizado";
         checkFutureRate(dataBCV.monedas.usd.fecha_valor || null);
         updateDashboard();
-        calculate('divisa'); // Refresca si hay datos en input
+        calculate('divisa');
         haptic();
 
     } catch (error) {
-        console.warn('Error fetching API, cargando caché local:', error);
+        console.warn('Fallo de red, cargando caché local:', error);
         
         const cached = localStorage.getItem('tasasVzlaCache');
         if (cached) {

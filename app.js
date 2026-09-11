@@ -17,7 +17,7 @@ const inputVes = document.getElementById('input-ves');
 const igtfSwitch = document.getElementById('igtf-switch');
 const toast = document.getElementById('toast');
 
-// Haptic Feedback
+// Haptic Feedback (Vibración nativa si está disponible)
 const haptic = () => {
     if (navigator.vibrate) navigator.vibrate(15);
 };
@@ -43,12 +43,10 @@ const updateDashboard = () => {
 
 // Lógica de Tasa Anticipada (Banner)
 const checkFutureRate = (bcvDateStr) => {
-    // Ejemplo bcvDateStr esperado: "2026-09-12" (Asumimos API entrega YYYY-MM-DD para 'fecha valor')
     const banner = document.getElementById('future-rate-banner');
     if (!bcvDateStr) return;
 
     const today = new Date();
-    // Ajustar a zona horaria local de Venezuela de manera simplificada
     const localDate = today.toISOString().split('T')[0];
 
     if (bcvDateStr > localDate) {
@@ -84,11 +82,10 @@ igtfSwitch.addEventListener('change', () => { haptic(); calculate('divisa'); });
 
 document.getElementById('swap-btn').addEventListener('click', () => {
     haptic();
-    // Invertir visualmente y cambiar el cálculo
     const t = inputDivisa.value;
     inputDivisa.value = inputVes.value;
     inputVes.value = t;
-    calculate('divisa'); // Forzar recálculo
+    calculate('divisa'); 
 });
 
 // Quick Chips
@@ -120,13 +117,11 @@ document.querySelectorAll('.clickable').forEach(card => {
     });
 });
 
-// Consumo de API
-// Consumo de API con Proxy CORS para uso personal
+// Consumo de API usando Proxy CORS
 const fetchRates = async () => {
     refreshBtn.classList.add('spin');
     
     try {
-        // Usamos corsproxy.io para saltar la restricción del navegador
         const urlBCV = encodeURIComponent('https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=bcv');
         const urlBinance = encodeURIComponent('https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=binance');
 
@@ -144,8 +139,10 @@ const fetchRates = async () => {
             date: dataBCV.monedas.usd.last_update || new Date().toISOString()
         };
 
+        // Cacheo Offline
         localStorage.setItem('tasasVzlaCache', JSON.stringify(rates));
         
+        // Actualizar UI
         statusDot.className = 'dot green';
         statusText.innerText = "Actualizado";
         checkFutureRate(dataBCV.monedas.usd.fecha_valor || null);
@@ -154,7 +151,7 @@ const fetchRates = async () => {
         haptic();
 
     } catch (error) {
-        console.warn('Fallo de red, cargando caché local:', error);
+        console.warn('Fallo de red o CORS, cargando caché local:', error);
         
         const cached = localStorage.getItem('tasasVzlaCache');
         if (cached) {
@@ -170,19 +167,20 @@ const fetchRates = async () => {
     }
 };
 
+// Evento de refresco manual
 refreshBtn.addEventListener('click', () => {
     haptic();
     fetchRates();
 });
 
-// Init
+// Inicialización de la App
 window.addEventListener('DOMContentLoaded', () => {
-    // Intentar cargar caché primero para rapidez extrema
+    // 1. Intentar cargar caché local para que la UI no inicie en blanco
     const cached = localStorage.getItem('tasasVzlaCache');
     if (cached) {
         rates = JSON.parse(cached);
         updateDashboard();
     }
-    // Luego intentar refrescar de internet
+    // 2. Ejecutar la descarga en segundo plano
     fetchRates();
 });
